@@ -56,8 +56,8 @@
    
 }
 .hero-right img{
-  height: 100vh;
-  width: 90vh;
+  height: 90vh;
+  width: 70vh;
 }
 
 @media(max-width:1280px){

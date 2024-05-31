@@ -9,6 +9,7 @@ const cors = require("cors");
 
 
 
+
 app.use(express.json());
 app.use(cors());
 
@@ -42,6 +43,19 @@ app.post("/upload",upload.single('product'),(req,res)=>{
          })
 })
 
+const checkToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) return res.status(403).json({ message: 'No token provided.' });
+
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(403).json({ message: 'No token provided.' });
+
+    jwt.verify(token, 'secret_ecom', (err, decoded) => {
+        if (err) return res.status(500).json({ message: 'Failed to authenticate token.' });
+        req.userId = decoded.user.id;
+        next();
+    });
+};
 
 //schema for creating products
 const Product=mongoose.model("Product",{
@@ -101,22 +115,39 @@ const userSchema = new mongoose.Schema({
     available: {
         type: Boolean,
         default: true,
+    },
+    blocked: {
+        type: Boolean,
+        default: false,
     }
 });
 
 const User = mongoose.model("User", userSchema);
 
 //Creating API for Getting All Products
-app.get('/allusers', async (req, res) => {
-    try {
-        const users = await User.find({});
-        console.log("All users fetched");
-        res.send(users);
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).send('Internal Server Error');
-    }
-});
+// app.get('/allusers', async (req, res) => {
+//     try {
+//         const users = await User.find({});
+//         console.log("All users fetched");
+//         res.send(users);
+//     } catch (error) {
+//         console.error('Error fetching users:', error);
+//         res.status(500).send('Internal Server Error');
+//     }
+// });
+
+const secretKey = 'your-secret-key';
+
+const authenticateToken = (req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, secretKey, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
 
 app.post('/addproduct',async(req,res)=>{
     let products = await Product.find({});
@@ -212,6 +243,7 @@ app.post('/signup',async(req,res)=>{
     const token = jwt.sign(data,'secret_ecom');
     res.json({success:true,token})
 })
+
 
 //creating end point for login user
 app.post('/login',async(req,res)=>{
@@ -317,6 +349,93 @@ app.post('/updateproduct', async (req, res) => {
     }
 });
 
+
+// Endpoint to block a user
+app.post('/blockuser', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOneAndUpdate(
+            { email },
+            { blocked: true },
+            { new: true }
+        );
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        res.json({ success: true, message: 'User blocked successfully' });
+    } catch (error) {
+        console.error('Error blocking user:', error);
+        res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+});
+
+// Endpoint to unblock a user
+app.post('/unblockuser', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await User.findOneAndUpdate(
+            { email },
+            { blocked: false },
+            { new: true }
+        );
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        res.json({ success: true, message: 'User unblocked successfully' });
+    } catch (error) {
+        console.error('Error unblocking user:', error);
+        res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+});
+// Fetch all users including their blocked status
+app.get('/allusers', async (req, res) => {
+    try {
+        const users = await User.find({});
+        res.json(users);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+ 
+
+
+// Middleware for checking token
+// const checkToken = (req, res, next) => {
+//     const token = req.headers['Authorization'];
+//     if (!token) return res.status(403).send({ message: 'No token provided.' });
+
+//     jwt.verify(token, 'auth-token', (err, decoded) => {
+//         if (err) return res.status(500).send({ message: 'Failed to authenticate token.' });
+//         req.userId = decoded.id;
+//         next();
+//     });
+// };
+
+// // This could be your user data
+// const users = [
+//     { id: 1, name: 'User 1', isActive: true },
+//     { id: 2, name: 'User 2', isActive: false },
+//     { id: 3, name: 'User 3', isActive: true },
+// ];
+
+app.get('/activeUser', checkToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId).select('-password'); // Exclude the password field
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.json(user);
+    } catch (error) {
+        console.error('Error fetching user details:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+});
+
+app.listen(3000, () => console.log('Server is running on port 3000'));
+
+
+
 app.listen(port,(error)=>{
     if(!error){
         console.log("Server Running on port"+port);
@@ -325,3 +444,5 @@ app.listen(port,(error)=>{
         console.log("error"+error);
     }
 });
+
+

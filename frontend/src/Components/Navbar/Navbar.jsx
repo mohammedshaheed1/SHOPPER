@@ -6,6 +6,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ShopContext } from '../../Context/ShopContext'
 import nav_dropdown from '../Assets/nav_dropdown.png'
+import { Dropdown, NavDropdown } from 'react-bootstrap'
+
+
 
 function Navbar() {
 
@@ -17,7 +20,7 @@ function Navbar() {
           e.target.classList.toggle('open');
     }
   return (
-    <div className='navbar'>
+    <div className='custom-navbar'>
         <div className="nav-logo">
             <img  src={logo} alt="" />
             <p>SHOPPER</p>
@@ -31,7 +34,27 @@ function Navbar() {
         </ul>
         <div className="nav-login-cart">
         {localStorage.getItem('auth-token') ? 
-         <button onClick={() => { localStorage.removeItem('auth-token'); window.location.replace('/'); }}>Logout</button>
+          
+          
+          <Dropdown>
+          <Dropdown.Toggle variant="success" id="dropdown-basic">
+              Account
+          </Dropdown.Toggle>
+
+          <Dropdown.Menu align="end">
+              <Dropdown.Item>Your account</Dropdown.Item>
+              <Dropdown.Item>
+               <Link style={{textDecoration:'none'}} to="/orders">Your orders</Link>
+              </Dropdown.Item>
+              <Dropdown.Item>
+              <Link style={{textDecoration:'none'}} to="/profile"> Your profile</Link>
+              </Dropdown.Item>
+              <Dropdown.Divider />
+              <Dropdown.Item style={{color:"red"}} onClick={() => { localStorage.removeItem('auth-token'); window.location.replace('/'); }}>
+                  Logout
+              </Dropdown.Item>
+          </Dropdown.Menu>
+      </Dropdown>
            : <Link to="/login"><button>Login</button></Link>}
 
            <Link to='/cart'> <img src={cart_icon} alt="" /></Link>  
@@ -43,3 +66,6 @@ function Navbar() {
 }
 
 export default Navbar
+
+
+
