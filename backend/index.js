@@ -1,4 +1,4 @@
-const port =4000;
+const port = 4000;
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
@@ -13,7 +13,7 @@ const cors = require("cors");
 app.use(express.json());
 app.use(cors());
 
-//Database connection with mongodb
+// Database connection with MongoDB
 mongoose.connect("mongodb+srv://shaheedshanu:shanu7510@cluster0.0dbcyhk.mongodb.net/e-commerce");
 
 //API creation
@@ -43,6 +43,11 @@ app.post("/upload",upload.single('product'),(req,res)=>{
          })
 })
 
+
+
+
+
+// Token verification middleware
 const checkToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     if (!authHeader) return res.status(403).json({ message: 'No token provided.' });
@@ -57,44 +62,45 @@ const checkToken = (req, res, next) => {
     });
 };
 
-//schema for creating products
-const Product=mongoose.model("Product",{
-       id:{
-            type:Number,
-            required:true,
-       },
-       name:{
-             type:String,
-             required:true,
-       },
-       image:{
-             type:String,
-             required:true,
+// Schema for creating products
+const productSchema = new mongoose.Schema({
+    id: {
+        type: Number,
+        required: true,
+    },
+    name: {
+        type: String,
+        required: true,
+    },
+    image: {
+        type: String,
+        required: true,
+    },
+    category: {
+        type: String,
+        required: true,
+    },
+    new_price: {
+        type: Number,
+        required: true,
+    },
+    old_price: {
+        type: Number,
+        required: true,
+    },
+    date: {
+        type: Date,
+        default: Date.now,
+    },
+    available: {
+        type: Boolean,
+        default: true,
+    }
+});
 
-       },
-       category:{
-             type:String,
-             required:true,
-       },
-       new_price:{
-             type:Number,
-             required:true,
-       },
-       old_price:{
-           type:Number,
-           required:true,
-       },
-       date:{
-        type:Date,
-        default:Date.now,
-       },
-       available:{
-            type:Boolean,
-            default:true,
-       }
-})
+const Product = mongoose.model("Product", productSchema);
 
-//schema for creating Users
+// Schema for creating Users
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -103,6 +109,7 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
+        unique: true
     },
     password: {
         type: String,
@@ -119,217 +126,156 @@ const userSchema = new mongoose.Schema({
     blocked: {
         type: Boolean,
         default: false,
-    }
+    },
+    cartData: {
+        type: Object,
+    },
 });
 
 const User = mongoose.model("User", userSchema);
 
-//Creating API for Getting All Products
-// app.get('/allusers', async (req, res) => {
-//     try {
-//         const users = await User.find({});
-//         console.log("All users fetched");
-//         res.send(users);
-//     } catch (error) {
-//         console.error('Error fetching users:', error);
-//         res.status(500).send('Internal Server Error');
-//     }
-// });
-
-const secretKey = 'your-secret-key';
-
-const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization'];
-    if (!token) return res.sendStatus(401);
-
-    jwt.verify(token, secretKey, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-    });
-};
-
-app.post('/addproduct',async(req,res)=>{
+// Endpoint for adding a product
+app.post('/addproduct', async (req, res) => {
     let products = await Product.find({});
     let id;
-    if(products.length>0){
-        let last_product_array=products.slice(-1);
-        let last_product=last_product_array[0];
-        id=last_product.id+1
-    }else{
-        id=1;
+    if (products.length > 0) {
+        let last_product = products[products.length - 1];
+        id = last_product.id + 1;
+    } else {
+        id = 1;
     }
     const product = new Product({
-        id:id,
-        name:req.body.name,
-        image:req.body.image,
-        category:req.body.category,
-        new_price:req.body.new_price,
-        old_price:req.body.old_price,
-
+        id: id,
+        name: req.body.name,
+        image: req.body.image,
+        category: req.body.category,
+        new_price: req.body.new_price,
+        old_price: req.body.old_price,
     });
-    console.log(product);
     await product.save();
-    console.log("saved")
     res.json({
-        success:true,
-        name:req.body.name
-    })
-})
+        success: true,
+        name: req.body.name
+    });
+});
 
-//creating Api for remove product
-app.post('/removeproduct',async(req,res)=>{
-   await Product.findOneAndDelete({id:req.body.id});
-   console.log("removed product");
-   res.json({
-       success:true,
-       name:req.body.name
+// Endpoint for removing a product
+app.post('/removeproduct', async (req, res) => {
+    await Product.findOneAndDelete({ id: req.body.id });
+    res.json({
+        success: true,
+        id: req.body.id
+    });
+});
 
-   })
-})
-
-//Creating API for Getting All Products
-app.get('/allproducts',async(req,res)=>{
+// Endpoint for getting all products
+app.get('/allproducts', async (req, res) => {
     let products = await Product.find({});
-    console.log("All products fetched");
-    res.send(products)
-})
+    res.send(products);
+});
 
-
-//schema creating for user model
-const Users = mongoose.model('Users',{
-    name:{
-        type:String,
-    },
-    email:{
-        type:String,
-        unique:true,
-    },
-    password:{
-        type:String,
-    },
-    cartData:{
-        type:Object,
-    },
-    date:{
-        type:Date,
-        default:Date.now,
+// Endpoint for user registration
+app.post('/signup', async (req, res) => {
+    let check = await User.findOne({ email: req.body.email });
+    if (check) {
+        return res.status(400).json({ success: false, errors: "Existing user found with email address" });
     }
-})
-
-//creatind endpoint for registering user
-app.post('/signup',async(req,res)=>{
-    let check = await Users.findOne({email:req.body.email})
-    if(check){
-        return res.status(400).json({success:false,errors:"existing user found with email address"})
+    let cart = {};
+    for (let i = 0; i < 300; i++) {
+        cart[i] = 0;
     }
-    let cart={};
-    for(let i=0; i<300; i++){
-        cart[i]=0
-    }
-    const user = new Users({
-        name:req.body.username,
-        email:req.body.email,
-        password:req.body.password,
-        cartData:cart
-    })
+    const user = new User({
+        name: req.body.username,
+        email: req.body.email,
+        password: req.body.password,
+        cartData: cart
+    });
     await user.save();
     
-    const data={
-        user:{
-            id:user.id
+    const data = {
+        user: {
+            id: user.id
         }
-    }
-    const token = jwt.sign(data,'secret_ecom');
-    res.json({success:true,token})
-})
+    };
+    const token = jwt.sign(data, 'secret_ecom');
+    res.json({ success: true, token });
+});
 
-
-//creating end point for login user
-app.post('/login',async(req,res)=>{
-    let user = await Users.findOne({email:req.body.email});
-    if(user){
-        const passCompare = req.body.password===user.password;
-        if(passCompare){
-            const data={
-                user:{
-                    id:user.id
+// Endpoint for user login
+app.post('/login', async (req, res) => {
+    let user = await User.findOne({ email: req.body.email });
+    if (user) {
+        const passCompare = req.body.password === user.password;
+        if (passCompare) {
+            const data = {
+                user: {
+                    id: user.id
                 }
-               
+            };
+            const token = jwt.sign(data, 'secret_ecom');
+            res.json({ success: true, token });
+        } else {
+            res.json({ success: false, errors: "Wrong Password" });
         }
-        const token=  jwt.sign(data,'secret_ecom');
-        res.json({success:true,token})
-     }
-     else{
-        res.json({success:false,errors:"Wrong Password"})
-     }
+    } else {
+        res.json({ success: false, errors: "Wrong Email" });
     }
-    else{
-        res.json({success:false,errors:"Wrong Email"})
-    }
+});
 
-})
+// Endpoint for new collections
+app.get('/newcollections', async (req, res) => {
+    let products = await Product.find({});
+    let newCollection = products.slice(1).slice(-8);
+    res.send(newCollection);
+});
 
-//creating endpoint for new collection
-app.get('/newcollections',async(req,res)=>{
-    let products=await Product.find({})
-    let newcollection=products.slice(1).slice(-8);
-    console.log("new collections fetched");
-    res.send(newcollection)
-})
+// Endpoint for popular in women
+app.get("/popularinwomen", async (req, res) => {
+    let products = await Product.find({ category: "women" });
+    let popularInWomen = products.slice(0, 4);
+    res.send(popularInWomen);
+});
 
-//creating endpoint for popular in women
-app.get("/popularinwomen",async(req,res)=>{
-       let products=await Product.find({category:"women"});
-       let popular_in_women=products.slice(0,4)
-       console.log("popula in women fetched");
-       res.send(popular_in_women)
-})
-
-//creating middleware to fetch user
-const fetchUser = async(req,res,next)=>{
-    const token =req.header('auth-token');
-    if(!token){
-        res.status(401).send({errors:"please authenticate using valid token"})
-    }
-    else{
-        try{
-            const data=jwt.verify(token,'secret_ecom');
-            req.user=data.user;
+// Middleware to fetch user
+const fetchUser = async (req, res, next) => {
+    const token = req.header('auth-token');
+    if (!token) {
+        res.status(401).send({ errors: "Please authenticate using a valid token" });
+    } else {
+        try {
+            const data = jwt.verify(token, 'secret_ecom');
+            req.user = data.user;
             next();
-        }
-        catch(error){
-            res.status(401).send({errors:"please authenticate using a valid token"})
+        } catch (error) {
+            res.status(401).send({ errors: "Please authenticate using a valid token" });
         }
     }
 }
 
-//creating end point for adding product in cartdata
-app.post('/addtocart',fetchUser,async(req,res)=>{
-    console.log("added",req.body.itemId)
-      let userData = await Users.findOne({_id:req.user.id});
-      userData.cartData[req.body.itemId]+=1;
-      await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData})
-      res.send("added")
-})
- 
-//creatng endpoint for removing product in cartdata
-app.post('/removefromcart',fetchUser,async(req,res)=>{
-    console.log("removed",req.body.itemId)
-    let userData = await Users.findOne({_id:req.user.id});
-    if(userData.cartData[req.body.itemId]>0)
-    userData.cartData[req.body.itemId]-=1;
-    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData})
-    res.send("removed")
-})
+// Endpoint for adding product to cart
+app.post('/addtocart', fetchUser, async (req, res) => {
+    let userData = await User.findOne({ _id: req.user.id });
+    userData.cartData[req.body.itemId] += 1;
+    await User.findOneAndUpdate({ _id: req.user.id }, { cartData: userData.cartData });
+    res.send("added");
+});
 
-//crearing endpoint for to get cartdata
-app.post('/getcart',fetchUser,async(req,res)=>{
-      console.log("GetCart");
-      let userData=await Users.findOne({_id:req.user.id})
-      res.json(userData.cartData);
-})
-//creating endpoint for to get upadate
+// Endpoint for removing product from cart
+app.post('/removefromcart', fetchUser, async (req, res) => {
+    let userData = await User.findOne({ _id: req.user.id });
+    if (userData.cartData[req.body.itemId] > 0)
+        userData.cartData[req.body.itemId] -= 1;
+    await User.findOneAndUpdate({ _id: req.user.id }, { cartData: userData.cartData });
+    res.send("removed");
+});
+
+// Endpoint for getting cart data
+app.post('/getcart', fetchUser, async (req, res) => {
+    let userData = await User.findOne({ _id: req.user.id });
+    res.json(userData.cartData);
+});
+
+// Endpoint for updating product
 app.post('/updateproduct', async (req, res) => {
     const { id, name, old_price, new_price, category, image } = req.body;
     try {
@@ -341,14 +287,11 @@ app.post('/updateproduct', async (req, res) => {
         if (!product) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
-        console.log("Updated product:", product);
         res.json({ success: true, product });
     } catch (error) {
-        console.error('Error updating product:', error);
         res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
-
 
 // Endpoint to block a user
 app.post('/blockuser', async (req, res) => {
@@ -364,7 +307,6 @@ app.post('/blockuser', async (req, res) => {
         }
         res.json({ success: true, message: 'User blocked successfully' });
     } catch (error) {
-        console.error('Error blocking user:', error);
         res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
@@ -383,42 +325,21 @@ app.post('/unblockuser', async (req, res) => {
         }
         res.json({ success: true, message: 'User unblocked successfully' });
     } catch (error) {
-        console.error('Error unblocking user:', error);
         res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
+
 // Fetch all users including their blocked status
 app.get('/allusers', async (req, res) => {
     try {
         const users = await User.find({});
         res.json(users);
     } catch (error) {
-        console.error('Error fetching users:', error);
         res.status(500).send('Internal Server Error');
     }
 });
- 
 
-
-// Middleware for checking token
-// const checkToken = (req, res, next) => {
-//     const token = req.headers['Authorization'];
-//     if (!token) return res.status(403).send({ message: 'No token provided.' });
-
-//     jwt.verify(token, 'auth-token', (err, decoded) => {
-//         if (err) return res.status(500).send({ message: 'Failed to authenticate token.' });
-//         req.userId = decoded.id;
-//         next();
-//     });
-// };
-
-// // This could be your user data
-// const users = [
-//     { id: 1, name: 'User 1', isActive: true },
-//     { id: 2, name: 'User 2', isActive: false },
-//     { id: 3, name: 'User 3', isActive: true },
-// ];
-
+// Endpoint to fetch active user
 app.get('/activeUser', checkToken, async (req, res) => {
     try {
         const user = await User.findById(req.userId).select('-password'); // Exclude the password field
@@ -427,22 +348,15 @@ app.get('/activeUser', checkToken, async (req, res) => {
         }
         res.json(user);
     } catch (error) {
-        console.error('Error fetching user details:', error);
         res.status(500).json({ message: 'Internal Server Error' });
     }
 });
 
-app.listen(3000, () => console.log('Server is running on port 3000'));
-
-
-
-app.listen(port,(error)=>{
-    if(!error){
-        console.log("Server Running on port"+port);
-    }
-    else{
-        console.log("error"+error);
+// Start the server
+app.listen(port, (error) => {
+    if (!error) {
+        console.log(`Server Running on port ${port}`);
+    } else {
+        console.log("Error: " + error);
     }
 });
-
-
